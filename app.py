@@ -26,54 +26,61 @@ class Message(db.Model):
 with app.app_context():
     db.create_all()
 
-# ----------------- API ENDPOINT'LERİ -----------------
+# ----------------- KÖK DİZİN (Test İçin) -----------------
+@app.route('/')
+def home():
+    return "Nexus SMP Server Active!"
 
+# ----------------- API ENDPOINT'LERİ -----------------
 @app.route('/api/register', methods=['POST'])
 def register():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
 
-    if not username or not password:
-        return jsonify({'status': 'error', 'message': 'Eksik bilgi!'}), 400
+        if not username or not password:
+            return jsonify({'status': 'error', 'message': 'Eksik bilgi!'}), 400
 
-    if User.query.filter_by(username=username).first():
-        return jsonify({'status': 'error', 'message': 'Bu kullanıcı adı zaten alınmış!'}), 400
+        if User.query.filter_by(username=username).first():
+            return jsonify({'status': 'error', 'message': 'Bu kullanıcı adı zaten alınmış!'}), 400
 
-    hashed_pw = generate_password_hash(password)
-    new_user = User(username=username, password_hash=hashed_pw)
-    db.session.add(new_user)
-    db.session.commit()
+        hashed_pw = generate_password_hash(password)
+        new_user = User(username=username, password_hash=hashed_pw)
+        db.session.add(new_user)
+        db.session.commit()
 
-    return jsonify({'status': 'success', 'message': 'Kayıt başarılı!'})
+        return jsonify({'status': 'success', 'message': 'Kayıt başarılı!'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
 
-    user = User.query.filter_by(username=username).first()
+        user = User.query.filter_by(username=username).first()
 
-    if user and check_password_hash(user.password_hash, password):
-        return jsonify({'status': 'success', 'message': 'Giriş başarılı!', 'username': user.username})
-    else:
-        return jsonify({'status': 'error', 'message': 'Kullanıcı adı veya şifre hatalı!'}), 401
+        if user and check_password_hash(user.password_hash, password):
+            return jsonify({'status': 'success', 'message': 'Giriş başarılı!', 'username': user.username})
+        else:
+            return jsonify({'status': 'error', 'message': 'Kullanıcı adı veya şifre hatalı!'}), 401
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # ----------------- SOCKET.IO -----------------
-
 @socketio.on('ping_server')
 def handle_ping(data):
     username = data.get('user', 'Anonim')
     message = data.get('message', '')
 
     if message:
-        # Mesajı geçici veritabanına yaz
         new_msg = Message(username=username, content=message)
         db.session.add(new_msg)
         db.session.commit()
 
-        # Tüm bağlı istemcilere mesajı yayınla
         emit('pong_client', {'user': username, 'message': message}, broadcast=True)
 
 if __name__ == '__main__':
